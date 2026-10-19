@@ -1,11 +1,48 @@
-// Ultra-lightweight WebRTC Signaling Server for Calculator Vault
-// Can be deployed on Glitch, Render, Railway, Fly.io, or run locally: `node server.js`
-
 const WebSocket = require('ws');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 
 const PORT = process.env.PORT || 8080;
 const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    if (req.url === '/version') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+            versionCode: 4,
+            versionName: '1.0.3',
+            apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
+            changelog: 'Native ear proximity sensor, crystal-clear 32kbps VoLTE voice, in-app auto updates'
+        }));
+        return;
+    }
+
+    if (req.url === '/download/app-release.apk') {
+        const apkPath = path.join(__dirname, 'public', 'app-release.apk');
+        if (fs.existsSync(apkPath)) {
+            const stat = fs.statSync(apkPath);
+            res.writeHead(200, {
+                'Content-Type': 'application/vnd.android.package-archive',
+                'Content-Length': stat.size,
+                'Content-Disposition': 'attachment; filename="Calculator_Vault.apk"'
+            });
+            fs.createReadStream(apkPath).pipe(res);
+            return;
+        } else {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('APK not found on server\n');
+            return;
+        }
+    }
+
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Calculator Vault Signaling Server is Active\n');
 });
