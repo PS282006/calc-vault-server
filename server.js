@@ -52,6 +52,13 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
+                case 'ping': {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'pong' }));
+                    }
+                    break;
+                }
+
                 case 'call':
                 case 'offer':
                 case 'answer':
