@@ -1,0 +1,12 @@
+{
+  "name": "calc-vault-server",
+  "version": "1.0.0",
+  "description": "Ultra-lightweight WebRTC signaling server for Calculator Vault",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
