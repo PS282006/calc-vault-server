@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 6,
-            versionName: '1.0.5',
+            versionCode: 7,
+            versionName: '1.0.6',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Smart stealth notifications, persistent update manager, live partner online status'
+            changelog: 'All-permission upfront request, instant screen wake, tap-to-open stealth notifications, enhanced long-call stability'
         }));
         return;
     }
