@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 8,
-            versionName: '1.0.7',
+            versionCode: 9,
+            versionName: '1.0.8',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Accurate live partner online status, self-socket deduplication, in-vault presence tracking'
+            changelog: 'Private Suite Messenger: Photos, Videos, Voice Notes, View Once, Persistent Chat, Panic Button, and WebRTC network handover fix'
         }));
         return;
     }
@@ -162,13 +162,14 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
+                case 'chat':
                 case 'call':
                 case 'offer':
                 case 'answer':
                 case 'ice-candidate':
                 case 'hangup':
                 case 'ringing': {
-                    // Relay signaling messages to all other peers in the same room
+                    // Relay signaling & chat messages to all other peers in the same room
                     if (currentRoom && rooms.has(currentRoom)) {
                         const roomClients = rooms.get(currentRoom);
                         for (const [cId, client] of roomClients.entries()) {
