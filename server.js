@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 14,
-            versionName: '1.3.1',
+            versionCode: 15,
+            versionName: '1.3.2',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'DSA Practice stealth incoming call notifications (DSA Practice: Daily Problem) and LeetCode disguise'
+            changelog: 'Official 3D Obsidian Gold Luxury App Icon with 3x3 gold arithmetic matrix'
         }));
         return;
     }
