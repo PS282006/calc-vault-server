@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 13,
-            versionName: '1.3.0',
+            versionCode: 14,
+            versionName: '1.3.1',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Atmospheric Liquid Aurora breathing mesh, frosted glass bubbles, swipe-to-reveal granular timestamps, and 3 ambient mood themes'
+            changelog: 'DSA Practice stealth incoming call notifications (DSA Practice: Daily Problem) and LeetCode disguise'
         }));
         return;
     }
