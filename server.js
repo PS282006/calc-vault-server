@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 10,
-            versionName: '1.0.9',
+            versionCode: 11,
+            versionName: '1.1.0',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Titanium luxury calculator, live camera video capture, customizable PIN, and Instagram quick reactions'
+            changelog: 'Custom partner avatar & title, live download progress bar, camera video capture, and titanium calculator'
         }));
         return;
     }
