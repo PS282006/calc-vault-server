@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 11,
-            versionName: '1.1.0',
+            versionCode: 12,
+            versionName: '1.2.0',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Custom partner avatar & title, live download progress bar, camera video capture, and titanium calculator'
+            changelog: 'Chrono-Obsidian FX-9900 Luxury Vault, 24k gold ingot equals key, call ringtone looping, and answer-after-PIN stealth flow'
         }));
         return;
     }
