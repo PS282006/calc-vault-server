@@ -17,10 +17,10 @@ const server = http.createServer((req, res) => {
     if (req.url === '/version') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 15,
-            versionName: '1.3.2',
+            versionCode: 16,
+            versionName: '1.4.0',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Official 3D Obsidian Gold Luxury App Icon with 3x3 gold arithmetic matrix'
+            changelog: 'Ultra-low latency real-time voice calls, offline chat persistence & auto-sync, fullscreen video calls, and scrubbable voice notes'
         }));
         return;
     }
@@ -51,6 +51,40 @@ const wss = new WebSocket.Server({ server });
 
 // Map of roomId -> Map of clientId -> { ws, inVault, lastSeen }
 const rooms = new Map();
+
+// Map of roomId -> Array of stored message objects: { id, action, payload, timestamp }
+const roomHistory = new Map();
+
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (_) {}
+}
+
+function loadRoomHistory(roomId) {
+    if (roomHistory.has(roomId)) return roomHistory.get(roomId);
+    const filePath = path.join(DATA_DIR, `history_${roomId}.json`);
+    if (fs.existsSync(filePath)) {
+        try {
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+            if (Array.isArray(data)) {
+                roomHistory.set(roomId, data);
+                return data;
+            }
+        } catch (_) {}
+    }
+    const empty = [];
+    roomHistory.set(roomId, empty);
+    return empty;
+}
+
+function saveRoomHistory(roomId) {
+    const list = roomHistory.get(roomId);
+    if (!list) return;
+    const filePath = path.join(DATA_DIR, `history_${roomId}.json`);
+    try {
+        fs.writeFileSync(filePath, JSON.stringify(list.slice(-300)), 'utf8');
+    } catch (_) {}
+}
 
 // Automatic dead-socket purger every 15 seconds
 const heartbeatInterval = setInterval(() => {
@@ -119,6 +153,16 @@ wss.on('connection', (ws) => {
                         peerPresent: partnerInVault
                     }));
 
+                    // Send complete offline/stored message history to the newly connected/joined client!
+                    const history = loadRoomHistory(roomId);
+                    if (history.length > 0) {
+                        ws.send(JSON.stringify({
+                            type: 'sync_history',
+                            roomId,
+                            messages: history.map(item => item.payload)
+                        }));
+                    }
+
                     // If this client joined inVault, notify other live clients
                     if (inVault) {
                         for (const [cId, client] of roomClients.entries()) {
@@ -129,6 +173,18 @@ wss.on('connection', (ws) => {
                                 }));
                             }
                         }
+                    }
+                    break;
+                }
+
+                case 'sync_request': {
+                    if (currentRoom) {
+                        const history = loadRoomHistory(currentRoom);
+                        ws.send(JSON.stringify({
+                            type: 'sync_history',
+                            roomId: currentRoom,
+                            messages: history.map(item => item.payload)
+                        }));
                     }
                     break;
                 }
@@ -162,14 +218,72 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
-                case 'chat':
+                case 'chat': {
+                    if (currentRoom && payload) {
+                        const action = payload.action;
+                        const history = loadRoomHistory(currentRoom);
+
+                        if (action === 'message' && payload.message) {
+                            const msgId = payload.message.id;
+                            // Avoid duplicate storage
+                            if (!history.some(item => item.id === msgId)) {
+                                history.push({
+                                    id: msgId,
+                                    action: 'message',
+                                    payload: payload,
+                                    timestamp: Date.now()
+                                });
+                                if (history.length > 300) history.shift();
+                                saveRoomHistory(currentRoom);
+                            }
+                        } else if (action === 'unsend' && payload.id) {
+                            const unsendId = payload.id;
+                            const idx = history.findIndex(item => item.id === unsendId);
+                            if (idx !== -1) {
+                                history.splice(idx, 1);
+                                saveRoomHistory(currentRoom);
+                            }
+                        } else if (action === 'reaction' && payload.id) {
+                            const targetId = payload.id;
+                            const item = history.find(it => it.id === targetId);
+                            if (item && item.payload && item.payload.message) {
+                                item.payload.message.reaction = payload.reaction;
+                                saveRoomHistory(currentRoom);
+                            }
+                        } else if (action === 'view_once_opened' && payload.id) {
+                            const targetId = payload.id;
+                            const item = history.find(it => it.id === targetId);
+                            if (item && item.payload && item.payload.message) {
+                                item.payload.message.isOpened = true;
+                                delete item.payload.mediaData; // incinerate media payload
+                                saveRoomHistory(currentRoom);
+                            }
+                        }
+
+                        // Relay chat payload immediately to all other connected peers in the room
+                        if (rooms.has(currentRoom)) {
+                            const roomClients = rooms.get(currentRoom);
+                            for (const [cId, client] of roomClients.entries()) {
+                                if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                    client.ws.send(JSON.stringify({
+                                        type: 'chat',
+                                        roomId: currentRoom,
+                                        payload
+                                    }));
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+
                 case 'call':
                 case 'offer':
                 case 'answer':
                 case 'ice-candidate':
                 case 'hangup':
                 case 'ringing': {
-                    // Relay signaling & chat messages to all other peers in the same room
+                    // Relay signaling messages to all other peers in the same room
                     if (currentRoom && rooms.has(currentRoom)) {
                         const roomClients = rooms.get(currentRoom);
                         for (const [cId, client] of roomClients.entries()) {
