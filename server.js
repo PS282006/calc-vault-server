@@ -15,10 +15,11 @@ const server = http.createServer((req, res) => {
     }
 
     if (req.url === '/version') {
+        console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 16,
-            versionName: '1.4.0',
+            versionCode: 17,
+            versionName: '1.4.1',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
             changelog: 'Ultra-low latency real-time voice calls, offline chat persistence & auto-sync, fullscreen video calls, and scrubbable voice notes'
         }));
@@ -26,6 +27,7 @@ const server = http.createServer((req, res) => {
     }
 
     if (req.url === '/download/app-release.apk') {
+        console.log(`[${new Date().toISOString()}] OTA APK download request from ${req.socket.remoteAddress}`);
         const apkPath = path.join(__dirname, 'public', 'app-release.apk');
         if (fs.existsSync(apkPath)) {
             const stat = fs.statSync(apkPath);
