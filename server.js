@@ -18,10 +18,10 @@ const server = http.createServer((req, res) => {
         console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 17,
-            versionName: '1.4.1',
+            versionCode: 18,
+            versionName: '1.4.2',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Ultra-low latency real-time voice calls, offline chat persistence & auto-sync, fullscreen video calls, and scrubbable voice notes'
+            changelog: 'Studio Hi-Fi Audio (64kbps fullband calls + 128kbps voice notes), live typing indicators, and interactive reactive audio waveforms with 1.5x/2x speed'
         }));
         return;
     }
@@ -279,6 +279,7 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
+                case 'typing':
                 case 'call':
                 case 'offer':
                 case 'answer':
