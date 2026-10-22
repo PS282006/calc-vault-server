@@ -18,12 +18,40 @@ const server = http.createServer((req, res) => {
         console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 19,
-            versionName: '1.4.3',
+            versionCode: 20,
+            versionName: '1.4.4',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Two-way bidirectional video calling fix: both faces fully visible in full screen & PiP, automatic video answer, and mid-call camera renegotiation'
+            changelog: '1:1 Samsung One UI Calculator replica, normal notification chime, instant call decline, and reliable answering'
         }));
         return;
+    }
+
+    if (req.url && req.url.startsWith('/decline-call')) {
+        try {
+            const urlObj = new URL(req.url, `http://${req.headers.host}`);
+            const rId = urlObj.searchParams.get('roomId');
+            console.log(`[${new Date().toISOString()}] /decline-call HTTP received for room ${rId}`);
+            if (rId && rooms.has(rId)) {
+                activeCalls.delete(rId);
+                const roomClients = rooms.get(rId);
+                for (const [cId, client] of roomClients.entries()) {
+                    if (client.ws.readyState === WebSocket.OPEN) {
+                        client.ws.send(JSON.stringify({
+                            type: 'hangup',
+                            roomId: rId,
+                            payload: { reason: 'declined' }
+                        }));
+                    }
+                }
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ success: true }));
+            return;
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+            return;
+        }
     }
 
     if (req.url === '/download/app-release.apk') {
@@ -53,6 +81,9 @@ const wss = new WebSocket.Server({ server });
 
 // Map of roomId -> Map of clientId -> { ws, inVault, lastSeen }
 const rooms = new Map();
+
+// Map of roomId -> { callerClientId, isVideo, offer, timestamp }
+const activeCalls = new Map();
 
 // Map of roomId -> Array of stored message objects: { id, action, payload, timestamp }
 const roomHistory = new Map();
@@ -163,6 +194,23 @@ wss.on('connection', (ws) => {
                             roomId,
                             messages: history.map(item => item.payload)
                         }));
+                    }
+
+                    // Check if an incoming call was already in progress for this room (< 45s old)
+                    const pendingCall = activeCalls.get(roomId);
+                    if (pendingCall && (Date.now() - pendingCall.timestamp) < 45000 && pendingCall.callerClientId !== currentClientId) {
+                        ws.send(JSON.stringify({
+                            type: 'call',
+                            roomId,
+                            payload: { video: pendingCall.isVideo }
+                        }));
+                        if (pendingCall.offer) {
+                            ws.send(JSON.stringify({
+                                type: 'offer',
+                                roomId,
+                                payload: pendingCall.offer
+                            }));
+                        }
                     }
 
                     // If this client joined inVault, notify other live clients
@@ -279,12 +327,75 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
+                case 'call': {
+                    if (currentRoom) {
+                        activeCalls.set(currentRoom, {
+                            callerClientId: currentClientId,
+                            isVideo: !!(payload && payload.video),
+                            timestamp: Date.now()
+                        });
+                    }
+                    // Relay call to peers
+                    if (currentRoom && rooms.has(currentRoom)) {
+                        const roomClients = rooms.get(currentRoom);
+                        for (const [cId, client] of roomClients.entries()) {
+                            if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                client.ws.send(JSON.stringify({ type, roomId: currentRoom, payload }));
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'offer': {
+                    if (currentRoom && activeCalls.has(currentRoom)) {
+                        const c = activeCalls.get(currentRoom);
+                        c.offer = payload;
+                    }
+                    // Relay offer to peers
+                    if (currentRoom && rooms.has(currentRoom)) {
+                        const roomClients = rooms.get(currentRoom);
+                        for (const [cId, client] of roomClients.entries()) {
+                            if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                client.ws.send(JSON.stringify({ type, roomId: currentRoom, payload }));
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'answer': {
+                    if (currentRoom) {
+                        activeCalls.delete(currentRoom);
+                    }
+                    if (currentRoom && rooms.has(currentRoom)) {
+                        const roomClients = rooms.get(currentRoom);
+                        for (const [cId, client] of roomClients.entries()) {
+                            if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                client.ws.send(JSON.stringify({ type, roomId: currentRoom, payload }));
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case 'hangup': {
+                    if (currentRoom) {
+                        activeCalls.delete(currentRoom);
+                    }
+                    if (currentRoom && rooms.has(currentRoom)) {
+                        const roomClients = rooms.get(currentRoom);
+                        for (const [cId, client] of roomClients.entries()) {
+                            if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                client.ws.send(JSON.stringify({ type, roomId: currentRoom, payload }));
+                            }
+                        }
+                    }
+                    break;
+                }
+
                 case 'typing':
-                case 'call':
-                case 'offer':
-                case 'answer':
                 case 'ice-candidate':
-                case 'hangup':
                 case 'ringing': {
                     // Relay signaling messages to all other peers in the same room
                     if (currentRoom && rooms.has(currentRoom)) {
