@@ -18,10 +18,10 @@ const server = http.createServer((req, res) => {
         console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 20,
-            versionName: '1.4.4',
+            versionCode: 21,
+            versionName: '1.4.5',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: '1:1 Samsung One UI Calculator replica, normal notification chime, instant call decline, and reliable answering'
+            changelog: 'Restore VoIP audio & video calling: bidirectional crystal-clear voice and HD video, Samsung One UI calculator'
         }));
         return;
     }
@@ -194,23 +194,6 @@ wss.on('connection', (ws) => {
                             roomId,
                             messages: history.map(item => item.payload)
                         }));
-                    }
-
-                    // Check if an incoming call was already in progress for this room (< 45s old)
-                    const pendingCall = activeCalls.get(roomId);
-                    if (pendingCall && (Date.now() - pendingCall.timestamp) < 45000 && pendingCall.callerClientId !== currentClientId) {
-                        ws.send(JSON.stringify({
-                            type: 'call',
-                            roomId,
-                            payload: { video: pendingCall.isVideo }
-                        }));
-                        if (pendingCall.offer) {
-                            ws.send(JSON.stringify({
-                                type: 'offer',
-                                roomId,
-                                payload: pendingCall.offer
-                            }));
-                        }
                     }
 
                     // If this client joined inVault, notify other live clients
