@@ -18,10 +18,10 @@ const server = http.createServer((req, res) => {
         console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 22,
-            versionName: '1.4.6',
+            versionCode: 23,
+            versionName: '1.4.7',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Opens chat directly at latest message, two-way VoIP audio & video calling, Samsung calculator interface'
+            changelog: '100% restored two-way audio & video calling, both faces visible, crystal-clear voice, Samsung calculator'
         }));
         return;
     }
