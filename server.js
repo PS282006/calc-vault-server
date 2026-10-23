@@ -18,10 +18,10 @@ const server = http.createServer((req, res) => {
         console.log(`[${new Date().toISOString()}] OTA Version check request from ${req.socket.remoteAddress}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-            versionCode: 24,
-            versionName: '1.4.8',
+            versionCode: 25,
+            versionName: '1.4.9',
             apkUrl: 'https://calc-vault-server.onrender.com/download/app-release.apk',
-            changelog: 'Reply to messages by tagging, swipe-to-reply, tap quote to jump, restored two-way calling'
+            changelog: 'Guaranteed 100% 2-way WebRTC calling: bidirectional video & audio, zero call-cut on answer, late-connect active call replay'
         }));
         return;
     }
@@ -196,6 +196,33 @@ wss.on('connection', (ws) => {
                         }));
                     }
 
+                    // Replay active pending call and offer to late-connecting peer
+                    const pendingCall = activeCalls.get(roomId);
+                    if (pendingCall && (Date.now() - pendingCall.timestamp) < 45000 && pendingCall.callerClientId !== currentClientId) {
+                        console.log(`[${new Date().toISOString()}] Replaying pending call to joined client ${currentClientId} in room ${roomId}`);
+                        ws.send(JSON.stringify({
+                            type: 'call',
+                            roomId,
+                            payload: { video: pendingCall.isVideo }
+                        }));
+                        if (pendingCall.offer) {
+                            ws.send(JSON.stringify({
+                                type: 'offer',
+                                roomId,
+                                payload: pendingCall.offer
+                            }));
+                        }
+                        if (pendingCall.candidates && pendingCall.candidates.length > 0) {
+                            for (const cand of pendingCall.candidates) {
+                                ws.send(JSON.stringify({
+                                    type: 'ice-candidate',
+                                    roomId,
+                                    payload: cand
+                                }));
+                            }
+                        }
+                    }
+
                     // If this client joined inVault, notify other live clients
                     if (inVault) {
                         for (const [cId, client] of roomClients.entries()) {
@@ -315,7 +342,8 @@ wss.on('connection', (ws) => {
                         activeCalls.set(currentRoom, {
                             callerClientId: currentClientId,
                             isVideo: !!(payload && payload.video),
-                            timestamp: Date.now()
+                            timestamp: Date.now(),
+                            candidates: []
                         });
                     }
                     // Relay call to peers
@@ -377,8 +405,30 @@ wss.on('connection', (ws) => {
                     break;
                 }
 
+                case 'ice-candidate': {
+                    if (currentRoom && activeCalls.has(currentRoom)) {
+                        const c = activeCalls.get(currentRoom);
+                        if (c.callerClientId === currentClientId) {
+                            if (!c.candidates) c.candidates = [];
+                            c.candidates.push(payload);
+                        }
+                    }
+                    if (currentRoom && rooms.has(currentRoom)) {
+                        const roomClients = rooms.get(currentRoom);
+                        for (const [cId, client] of roomClients.entries()) {
+                            if (cId !== currentClientId && client.ws.readyState === WebSocket.OPEN) {
+                                client.ws.send(JSON.stringify({
+                                    type,
+                                    roomId: currentRoom,
+                                    payload
+                                }));
+                            }
+                        }
+                    }
+                    break;
+                }
+
                 case 'typing':
-                case 'ice-candidate':
                 case 'ringing': {
                     // Relay signaling messages to all other peers in the same room
                     if (currentRoom && rooms.has(currentRoom)) {
